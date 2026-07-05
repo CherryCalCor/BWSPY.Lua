@@ -1,0 +1,617 @@
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+local CoreGui = (gethui and gethui()) or game:GetService("CoreGui")
+
+if CoreGui:FindFirstChild("BWSPY_Gui") then
+    CoreGui.BWSPY_Gui:Destroy()
+end
+
+-- ==========================================
+-- 1. ФУНКЦИИ ФОРМАТИРОВАНИЯ И ГЕНЕРАЦИИ
+-- ==========================================
+local function formatValue(val, indentLevel)
+    local t = typeof(val)
+    local indent = string.rep("    ", indentLevel or 0)
+    
+    if t == "string" then
+        return '"' .. val:gsub('"', '\\"') .. '"'
+    elseif t == "number" or t == "boolean" then
+        return tostring(val)
+    elseif t == "Instance" then
+        if val.Parent == nil then return "nil --[[ Destroyed Instance ]]" end
+        return val:GetFullName()
+    elseif t == "Vector3" then
+        return string.format("Vector3.new(%f, %f, %f)", val.X, val.Y, val.Z)
+    elseif t == "CFrame" then
+        return string.format("CFrame.new(%f, %f, %f)", val.X, val.Y, val.Z)
+    elseif t == "Color3" then
+        return string.format("Color3.new(%f, %f, %f)", val.R, val.G, val.B)
+    elseif t == "table" then
+        local str = "{\n"
+        local newIndent = indent .. "    "
+        for k, v in pairs(val) do
+            local keyStr = type(k) == "string" and '["' .. k .. '"]' or "[" .. tostring(k) .. "]"
+            str = str .. newIndent .. keyStr .. " = " .. formatValue(v, (indentLevel or 0) + 1) .. ",\n"
+        end
+        return str .. indent .. "}"
+    else
+        return "nil --[[ " .. t .. " ]]"
+    end
+end
+
+-- Генерация деталей для RemoteEvent/RemoteFunction
+local function generateRemoteDetails(remote, method, args)
+    local name = tostring(remote.Name)
+    local path = typeof(remote) == "Instance" and remote:GetFullName() or "Unknown"
+    local id = "N/A"
+    pcall(function()
+        id = remote:GetAttribute("Id") or remote:GetAttribute("ID") or "N/A"
+    end)
+
+    local displayText = "--- [ ДЕТАЛИ ПАКЕТА ] ---\n"
+    displayText = displayText .. "Имя: " .. name .. "\n"
+    displayText = displayText .. "ID: " .. tostring(id) .. "\n"
+    displayText = displayText .. "Метод: " .. method .. "\n"
+    displayText = displayText .. "Путь:\n" .. path .. "\n"
+    
+    displayText = displayText .. "\n--- [ АРГУМЕНТЫ ] ---\n"
+    if #args == 0 then
+        displayText = displayText .. "Нет аргументов\n"
+    else
+        for i, arg in ipairs(args) do
+            displayText = displayText .. "[" .. i .. "] = " .. formatValue(arg, 0) .. "\n"
+        end
+    end
+
+    displayText = displayText .. "\n--- [ ГОТОВЫЙ КОД ] ---\n"
+    local codeToCopy = "local args = {\n"
+    for i, arg in ipairs(args) do
+        codeToCopy = codeToCopy .. "    [" .. i .. "] = " .. formatValue(arg, 1) .. ",\n"
+    end
+    codeToCopy = codeToCopy .. "}\n\n"
+    codeToCopy = codeToCopy .. "game." .. path .. ":" .. method .. "(unpack(args))"
+    displayText = displayText .. codeToCopy
+
+    return displayText, codeToCopy
+end
+
+-- Генерация деталей для альтернативного метода (PacketTable)
+local function generatePacketDetails(name, id, args)
+    local displayText = "--- [ ПАКЕТ (Alt Method) ] ---\n"
+    displayText = displayText .. "Имя: " .. tostring(name) .. "\n"
+    displayText = displayText .. "ID: " .. tostring(id) .. "\n"
+    
+    displayText = displayText .. "\n--- [ АРГУМЕНТЫ ] ---\n"
+    if #args == 0 then
+        displayText = displayText .. "Нет аргументов\n"
+    else
+        for i, arg in ipairs(args) do
+            displayText = displayText .. "[" .. i .. "] = " .. formatValue(arg, 0) .. "\n"
+        end
+    end
+    -- Код не генерируем, так как это внутренняя механика
+    return displayText, ""
+end
+
+-- ==========================================
+-- 2. СОЗДАНИЕ ИНТЕРФЕЙСА
+-- ==========================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "BWSPY_Gui"
+ScreenGui.Parent = CoreGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "Main"
+MainFrame.Size = UDim2.new(0, 650, 0, 400)
+MainFrame.Position = UDim2.new(0.5, -325, 0.5, -200)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 15, 20)
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 30)
+TopBar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+TopBar.BackgroundTransparency = 0.5
+TopBar.BorderSizePixel = 0
+TopBar.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -100, 1, 0) -- уменьшили ширину, чтобы влезла шестерёнка
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "BWSPY V2.2 | Structured View"
+Title.TextColor3 = Color3.fromRGB(220, 200, 220)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TopBar
+
+-- Кнопка Settings (шестерёнка)
+local SettingsBtn = Instance.new("ImageButton")
+SettingsBtn.Size = UDim2.new(0, 28, 0, 28)
+SettingsBtn.Position = UDim2.new(1, -95, 0, 1) -- между заголовком и Minimize
+SettingsBtn.BackgroundTransparency = 1
+SettingsBtn.Image = "rbxassetid://10723349948"
+SettingsBtn.ImageColor3 = Color3.fromRGB(200, 180, 200)
+SettingsBtn.Parent = TopBar
+
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+MinimizeBtn.Position = UDim2.new(1, -60, 0, 0)
+MinimizeBtn.BackgroundTransparency = 1
+MinimizeBtn.Text = "-"
+MinimizeBtn.TextColor3 = Color3.new(1,1,1)
+MinimizeBtn.Font = Enum.Font.GothamBold
+MinimizeBtn.TextSize = 18
+MinimizeBtn.Parent = TopBar
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -30, 0, 0)
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 16
+CloseBtn.Parent = TopBar
+
+-- Основной контент (логи)
+local ContentHolder = Instance.new("Frame")
+ContentHolder.Size = UDim2.new(1, 0, 1, -30)
+ContentHolder.Position = UDim2.new(0, 0, 0, 30)
+ContentHolder.BackgroundTransparency = 1
+ContentHolder.Parent = MainFrame
+
+-- ЛЕВАЯ ПАНЕЛЬ
+local LeftPanel = Instance.new("ScrollingFrame")
+LeftPanel.Size = UDim2.new(0.35, -10, 1, -10)
+LeftPanel.Position = UDim2.new(0, 5, 0, 5)
+LeftPanel.BackgroundTransparency = 1
+LeftPanel.ScrollBarThickness = 4
+LeftPanel.ScrollBarImageColor3 = Color3.fromRGB(80, 50, 80)
+LeftPanel.AutomaticCanvasSize = Enum.AutomaticSize.Y
+LeftPanel.CanvasSize = UDim2.new(0, 0, 0, 0)
+LeftPanel.Parent = ContentHolder
+
+local LeftLayout = Instance.new("UIListLayout")
+LeftLayout.Padding = UDim.new(0, 5)
+LeftLayout.Parent = LeftPanel
+
+-- ПРАВАЯ ПАНЕЛЬ
+local RightPanel = Instance.new("Frame")
+RightPanel.Size = UDim2.new(0.65, -10, 1, -10)
+RightPanel.Position = UDim2.new(0.35, 5, 0, 5)
+RightPanel.BackgroundColor3 = Color3.fromRGB(10, 5, 10)
+RightPanel.BackgroundTransparency = 0.5
+RightPanel.BorderSizePixel = 0
+RightPanel.Parent = ContentHolder
+
+Instance.new("UICorner", RightPanel).CornerRadius = UDim.new(0, 6)
+
+local CodeScroll = Instance.new("ScrollingFrame")
+CodeScroll.Size = UDim2.new(1, -10, 1, -55) -- увеличен отступ снизу для кнопки
+CodeScroll.Position = UDim2.new(0, 5, 0, 5)
+CodeScroll.BackgroundTransparency = 1
+CodeScroll.ScrollBarThickness = 4
+CodeScroll.ScrollBarImageColor3 = Color3.fromRGB(80, 50, 80)
+CodeScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+CodeScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+CodeScroll.Parent = RightPanel
+
+local CodeText = Instance.new("TextLabel")
+CodeText.Size = UDim2.new(1, -5, 0, 0)
+CodeText.Position = UDim2.new(0, 5, 0, 0)
+CodeText.BackgroundTransparency = 1
+CodeText.Text = "-- Выберите RemoteEvent для просмотра деталей"
+CodeText.TextColor3 = Color3.fromRGB(200, 200, 200)
+CodeText.Font = Enum.Font.Code
+CodeText.TextSize = 13
+CodeText.TextXAlignment = Enum.TextXAlignment.Left
+CodeText.TextYAlignment = Enum.TextYAlignment.Top
+CodeText.TextWrapped = true
+CodeText.AutomaticSize = Enum.AutomaticSize.Y
+CodeText.Parent = CodeScroll
+
+local CopyBtn = Instance.new("TextButton")
+CopyBtn.Size = UDim2.new(1, -10, 0, 22) -- меньше по высоте
+CopyBtn.Position = UDim2.new(0, 5, 1, -38) -- выше
+CopyBtn.BackgroundColor3 = Color3.fromRGB(40, 20, 40)
+CopyBtn.Text = "Скопировать Только Код"
+CopyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CopyBtn.Font = Enum.Font.GothamBold
+CopyBtn.TextSize = 12
+CopyBtn.Parent = RightPanel
+Instance.new("UICorner", CopyBtn).CornerRadius = UDim.new(0, 4)
+
+-- ==========================================
+-- 3. МЕНЮ НАСТРОЕК
+-- ==========================================
+local SettingsFrame = Instance.new("Frame")
+SettingsFrame.Size = UDim2.new(1, 0, 1, 0)
+SettingsFrame.BackgroundColor3 = Color3.fromRGB(18, 13, 18)
+SettingsFrame.BorderSizePixel = 0
+SettingsFrame.Visible = false
+SettingsFrame.Parent = MainFrame
+
+local SettingsTopBar = Instance.new("Frame")
+SettingsTopBar.Size = UDim2.new(1, 0, 0, 30)
+SettingsTopBar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+SettingsTopBar.BackgroundTransparency = 0.5
+SettingsTopBar.BorderSizePixel = 0
+SettingsTopBar.Parent = SettingsFrame
+
+local BackBtn = Instance.new("TextButton")
+BackBtn.Size = UDim2.new(0, 60, 0, 30)
+BackBtn.Position = UDim2.new(0, 5, 0, 0)
+BackBtn.BackgroundTransparency = 1
+BackBtn.Text = "← Back"
+BackBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+BackBtn.Font = Enum.Font.Gotham
+BackBtn.TextSize = 14
+BackBtn.Parent = SettingsTopBar
+
+local SettingsTitle = Instance.new("TextLabel")
+SettingsTitle.Size = UDim2.new(1, -140, 1, 0)
+SettingsTitle.Position = UDim2.new(0, 70, 0, 0)
+SettingsTitle.BackgroundTransparency = 1
+SettingsTitle.Text = "Settings"
+SettingsTitle.TextColor3 = Color3.fromRGB(220, 200, 220)
+SettingsTitle.Font = Enum.Font.GothamBold
+SettingsTitle.TextSize = 14
+SettingsTitle.TextXAlignment = Enum.TextXAlignment.Left
+SettingsTitle.Parent = SettingsTopBar
+
+local SettingsMinimizeBtn = Instance.new("TextButton")
+SettingsMinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+SettingsMinimizeBtn.Position = UDim2.new(1, -60, 0, 0)
+SettingsMinimizeBtn.BackgroundTransparency = 1
+SettingsMinimizeBtn.Text = "-"
+SettingsMinimizeBtn.TextColor3 = Color3.new(1,1,1)
+SettingsMinimizeBtn.Font = Enum.Font.GothamBold
+SettingsMinimizeBtn.TextSize = 18
+SettingsMinimizeBtn.Parent = SettingsTopBar
+
+local SettingsCloseBtn = Instance.new("TextButton")
+SettingsCloseBtn.Size = UDim2.new(0, 30, 0, 30)
+SettingsCloseBtn.Position = UDim2.new(1, -30, 0, 0)
+SettingsCloseBtn.BackgroundTransparency = 1
+SettingsCloseBtn.Text = "X"
+SettingsCloseBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
+SettingsCloseBtn.Font = Enum.Font.GothamBold
+SettingsCloseBtn.TextSize = 16
+SettingsCloseBtn.Parent = SettingsTopBar
+
+-- Контент настроек
+local SettingsContent = Instance.new("Frame")
+SettingsContent.Size = UDim2.new(1, 0, 1, -30)
+SettingsContent.Position = UDim2.new(0, 0, 0, 30)
+SettingsContent.BackgroundTransparency = 1
+SettingsContent.Parent = SettingsFrame
+
+-- Переключатель PING
+local PingToggleFrame = Instance.new("Frame")
+PingToggleFrame.Size = UDim2.new(1, -20, 0, 36)
+PingToggleFrame.Position = UDim2.new(0, 10, 0, 15)
+PingToggleFrame.BackgroundColor3 = Color3.fromRGB(30, 20, 30)
+PingToggleFrame.BorderSizePixel = 0
+PingToggleFrame.Parent = SettingsContent
+Instance.new("UICorner", PingToggleFrame).CornerRadius = UDim.new(0, 6)
+
+local PingLabel = Instance.new("TextLabel")
+PingLabel.Size = UDim2.new(0, 120, 1, 0)
+PingLabel.Position = UDim2.new(0, 10, 0, 0)
+PingLabel.BackgroundTransparency = 1
+PingLabel.Text = "PING"
+PingLabel.TextColor3 = Color3.fromRGB(220, 200, 220)
+PingLabel.Font = Enum.Font.GothamBold
+PingLabel.TextSize = 14
+PingLabel.TextXAlignment = Enum.TextXAlignment.Left
+PingLabel.Parent = PingToggleFrame
+
+local PingToggleBtn = Instance.new("TextButton")
+PingToggleBtn.Size = UDim2.new(0, 44, 0, 24)
+PingToggleBtn.Position = UDim2.new(1, -54, 0.5, -12)
+PingToggleBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 100) -- включён
+PingToggleBtn.Text = ""
+PingToggleBtn.Parent = PingToggleFrame
+Instance.new("UICorner", PingToggleBtn).CornerRadius = UDim.new(1, 0)
+local PingToggleIndicator = Instance.new("Frame")
+PingToggleIndicator.Size = UDim2.new(0, 18, 0, 18)
+PingToggleIndicator.Position = UDim2.new(1, -20, 0.5, -9)
+PingToggleIndicator.BackgroundColor3 = Color3.new(1,1,1)
+PingToggleIndicator.BorderSizePixel = 0
+PingToggleIndicator.Parent = PingToggleBtn
+Instance.new("UICorner", PingToggleIndicator).CornerRadius = UDim.new(1, 0)
+
+local showPing = true -- по умолчанию включено
+
+-- Переключатель Another Method
+local AltMethodToggleFrame = Instance.new("Frame")
+AltMethodToggleFrame.Size = UDim2.new(1, -20, 0, 36)
+AltMethodToggleFrame.Position = UDim2.new(0, 10, 0, 65)
+AltMethodToggleFrame.BackgroundColor3 = Color3.fromRGB(30, 20, 30)
+AltMethodToggleFrame.BorderSizePixel = 0
+AltMethodToggleFrame.Parent = SettingsContent
+Instance.new("UICorner", AltMethodToggleFrame).CornerRadius = UDim.new(0, 6)
+
+local AltMethodLabel = Instance.new("TextLabel")
+AltMethodLabel.Size = UDim2.new(0, 160, 1, 0)
+AltMethodLabel.Position = UDim2.new(0, 10, 0, 0)
+AltMethodLabel.BackgroundTransparency = 1
+AltMethodLabel.Text = "Another method"
+AltMethodLabel.TextColor3 = Color3.fromRGB(220, 200, 220)
+AltMethodLabel.Font = Enum.Font.GothamBold
+AltMethodLabel.TextSize = 14
+AltMethodLabel.TextXAlignment = Enum.TextXAlignment.Left
+AltMethodLabel.Parent = AltMethodToggleFrame
+
+local AltMethodToggleBtn = Instance.new("TextButton")
+AltMethodToggleBtn.Size = UDim2.new(0, 44, 0, 24)
+AltMethodToggleBtn.Position = UDim2.new(1, -54, 0.5, -12)
+AltMethodToggleBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80) -- выключен
+AltMethodToggleBtn.Text = ""
+AltMethodToggleBtn.Parent = AltMethodToggleFrame
+Instance.new("UICorner", AltMethodToggleBtn).CornerRadius = UDim.new(1, 0)
+local AltMethodIndicator = Instance.new("Frame")
+AltMethodIndicator.Size = UDim2.new(0, 18, 0, 18)
+AltMethodIndicator.Position = UDim2.new(0, 2, 0.5, -9) -- слева
+AltMethodIndicator.BackgroundColor3 = Color3.new(1,1,1)
+AltMethodIndicator.BorderSizePixel = 0
+AltMethodIndicator.Parent = AltMethodToggleBtn
+Instance.new("UICorner", AltMethodIndicator).CornerRadius = UDim.new(1, 0)
+
+local useAlternativeMethod = false
+local alternativeOriginalFire = nil
+local alternativeHookedTable = nil
+
+-- Функция для обновления визуального состояния переключателя
+local function updatePingToggleVisual()
+    if showPing then
+        PingToggleBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
+        PingToggleIndicator.Position = UDim2.new(1, -20, 0.5, -9)
+    else
+        PingToggleBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+        PingToggleIndicator.Position = UDim2.new(0, 2, 0.5, -9)
+    end
+end
+
+local function updateAltMethodToggleVisual()
+    if useAlternativeMethod then
+        AltMethodToggleBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
+        AltMethodIndicator.Position = UDim2.new(1, -20, 0.5, -9)
+    else
+        AltMethodToggleBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+        AltMethodIndicator.Position = UDim2.new(0, 2, 0.5, -9)
+    end
+end
+
+-- Обработчики нажатий переключателей
+PingToggleBtn.MouseButton1Click:Connect(function()
+    showPing = not showPing
+    updatePingToggleVisual()
+end)
+
+AltMethodToggleBtn.MouseButton1Click:Connect(function()
+    useAlternativeMethod = not useAlternativeMethod
+    updateAltMethodToggleVisual()
+    if useAlternativeMethod then
+        -- Попытка включить альтернативный метод
+        local foundTable = nil
+        for _, v in pairs(getgc(true)) do
+            if type(v) == "table" and rawget(v, "Type") == "Packet" and rawget(v, "Fire") then
+                foundTable = v
+                break
+            end
+        end
+        if foundTable then
+            -- Сохраняем старый Fire
+            alternativeOriginalFire = foundTable.Fire
+            alternativeHookedTable = foundTable
+            foundTable.Fire = function(self, ...)
+                local args = {...}
+                local name = tostring(self.Name)
+                local id = tostring(self.Id)
+                -- Применяем фильтр PING
+                if showPing or not string.find(name, "Ping") then
+                    table.insert(LogQueue, {
+                        type = "Packet",
+                        name = name,
+                        id = id,
+                        args = args
+                    })
+                end
+                return alternativeOriginalFire(self, ...)
+            end
+            -- Отключаем __namecall хук
+            pcall(function()
+                hookmetamethod(game, "__namecall", trueOriginalNamecall)
+            end)
+            CodeText.Text = "// Alternate method activated (PacketTable hooked)"
+        else
+            useAlternativeMethod = false
+            updateAltMethodToggleVisual()
+            CodeText.Text = "// [ERROR] PacketTable not found. Alternative method cannot be enabled."
+        end
+    else
+        -- Выключение альтернативного метода
+        if alternativeHookedTable and alternativeOriginalFire then
+            alternativeHookedTable.Fire = alternativeOriginalFire
+            alternativeHookedTable = nil
+            alternativeOriginalFire = nil
+        end
+        -- Восстанавливаем __namecall хук
+        pcall(function()
+            oldNamecall = hookmetamethod(game, "__namecall", namecallHook)
+        end)
+        CodeText.Text = "// Alternate method disabled, standard hook restored"
+    end
+end)
+
+-- Кнопка Back и поведение кнопок Minimize/Close в меню
+BackBtn.MouseButton1Click:Connect(function()
+    SettingsFrame.Visible = false
+    ContentHolder.Visible = true
+end)
+
+SettingsMinimizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    local targetSize = isMinimized and UDim2.new(0, 650, 0, 30) or UDim2.new(0, 650, 0, 400)
+    ContentHolder.Visible = not isMinimized
+    SettingsFrame.Visible = false -- закрываем настройки при сворачивании
+    TweenService:Create(MainFrame, TweenInfo.new(0.3), {Size = targetSize}):Play()
+end)
+
+SettingsCloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- Открытие настроек по нажатию на шестерёнку
+SettingsBtn.MouseButton1Click:Connect(function()
+    SettingsFrame.Visible = true
+    ContentHolder.Visible = false
+end)
+
+-- ==========================================
+-- 4. DRAG & DROP
+-- ==========================================
+local dragging, dragStart, startPos
+TopBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = MainFrame.Position
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+-- ==========================================
+-- 5. ХУКИ И ЛОГИРОВАНИЕ
+-- ==========================================
+local currentCopyCode = ""
+CopyBtn.MouseButton1Click:Connect(function()
+    if currentCopyCode ~= "" and setclipboard then
+        setclipboard(currentCopyCode)
+        CopyBtn.Text = "Код скопирован!"
+        task.wait(1.5)
+        CopyBtn.Text = "Скопировать Только Код"
+    end
+end)
+
+local LogQueue = {}
+local MAX_LOGS = 150
+
+local function AddLogToUI(entry)
+    local LogFrame = Instance.new("TextButton")
+    LogFrame.Size = UDim2.new(1, 0, 0, 25)
+    LogFrame.BackgroundColor3 = Color3.fromRGB(30, 20, 30)
+    LogFrame.Text = ""
+    LogFrame.Parent = LeftPanel
+    Instance.new("UICorner", LogFrame).CornerRadius = UDim.new(0, 4)
+
+    local methodLabel, methodColor
+    local displayName
+
+    if entry.type == "Packet" then
+        methodLabel = "PKT"
+        methodColor = Color3.fromRGB(200, 150, 100)
+        displayName = entry.name .. " [" .. entry.id .. "]"
+    else
+        methodLabel = entry.method == "FireServer" and "FIRE" or "INVK"
+        methodColor = entry.method == "FireServer" and Color3.fromRGB(100, 200, 100) or Color3.fromRGB(100, 150, 255)
+        displayName = tostring(entry.remote.Name)
+    end
+
+    local MethodLbl = Instance.new("TextLabel", LogFrame)
+    MethodLbl.Size = UDim2.new(0, 40, 1, 0); MethodLbl.Position = UDim2.new(0, 5, 0, 0)
+    MethodLbl.BackgroundTransparency = 1
+    MethodLbl.Text = methodLabel
+    MethodLbl.TextColor3 = methodColor
+    MethodLbl.Font = Enum.Font.Code; MethodLbl.TextSize = 11; MethodLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local NameLbl = Instance.new("TextLabel", LogFrame)
+    NameLbl.Size = UDim2.new(1, -50, 1, 0); NameLbl.Position = UDim2.new(0, 45, 0, 0)
+    NameLbl.BackgroundTransparency = 1; NameLbl.Text = displayName; NameLbl.TextColor3 = Color3.fromRGB(200, 200, 200)
+    NameLbl.Font = Enum.Font.Code; NameLbl.TextSize = 11; NameLbl.TextXAlignment = Enum.TextXAlignment.Left
+    NameLbl.TextTruncate = Enum.TextTruncate.AtEnd
+
+    LogFrame.MouseButton1Click:Connect(function()
+        if entry.type == "Packet" then
+            local uiText, copyCode = generatePacketDetails(entry.name, entry.id, entry.args)
+            CodeText.Text = uiText
+            currentCopyCode = copyCode
+        else
+            local uiText, copyCode = generateRemoteDetails(entry.remote, entry.method, entry.args)
+            CodeText.Text = uiText
+            currentCopyCode = copyCode
+        end
+    end)
+
+    if #LeftPanel:GetChildren() > MAX_LOGS + 1 then
+        for i, child in ipairs(LeftPanel:GetChildren()) do
+            if child:IsA("TextButton") then child:Destroy(); break end
+        end
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    if #LogQueue > 0 then
+        local data = table.remove(LogQueue, 1)
+        pcall(AddLogToUI, data)
+    end
+end)
+
+-- Основной хук __namecall
+local trueOriginalNamecall
+local namecallHook = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    if not checkcaller() and (method == "FireServer" or method == "InvokeServer") then
+        local args = {...}
+        -- Применяем фильтр PING
+        local blacklist = {"UpdateMouse", "Heartbeat", "Move", "Mouse"} 
+        local isSpam = false
+        for _, name in ipairs(blacklist) do
+            if string.find(self.Name, name) then isSpam = true break end
+        end
+        if not isSpam and (showPing or not string.find(self.Name, "Ping")) then
+            table.insert(LogQueue, {
+                type = "Remote",
+                remote = self,
+                method = method,
+                args = args
+            })
+        end
+    end
+    return oldNamecall(self, ...)
+end)
+
+-- Установка хука
+trueOriginalNamecall = hookmetamethod(game, "__namecall", namecallHook)
+oldNamecall = trueOriginalNamecall
+
+-- Функция сворачивания (используется из настроек тоже)
+local isMinimized = false
+MinimizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    local targetSize = isMinimized and UDim2.new(0, 650, 0, 30) or UDim2.new(0, 650, 0, 400)
+    ContentHolder.Visible = not isMinimized
+    TweenService:Create(MainFrame, TweenInfo.new(0.3), {Size = targetSize}):Play()
+end)
+
+CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+
+-- Инициализация визуала переключателей
+updatePingToggleVisual()
+updateAltMethodToggleVisual()
