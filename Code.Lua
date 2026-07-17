@@ -3,6 +3,18 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local CoreGui = (gethui and gethui()) or game:GetService("CoreGui")
+local hookmetamethod = hookmetamethod or (hookfunction and function(obj, meta, func)
+    local mt = getrawmetatable(obj)
+    local old = mt[meta]
+    if setreadonly then setreadonly(mt, false) end
+    mt[meta] = func
+    if setreadonly then setreadonly(mt, true) end
+    return old
+end)
+local newcclosure = newcclosure or function(f) return f end
+local checkcaller = checkcaller or function() return false end
+local setclipboard = setclipboard or (toclipboard or print)
+local getgc = getgc or function() return {} end
 
 if CoreGui:FindFirstChild("BWSPY_Gui") then
     CoreGui.BWSPY_Gui:Destroy()
@@ -91,13 +103,14 @@ end
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "BWSPY_Gui"
+ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = CoreGui
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "Main"
 MainFrame.Size = UDim2.new(0, 650, 0, 400)
 MainFrame.Position = UDim2.new(0.5, -325, 0.5, -200)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 15, 20)
+MainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
 MainFrame.Parent = ScreenGui
@@ -108,43 +121,39 @@ UICorner.Parent = MainFrame
 
 local TopBar = Instance.new("Frame")
 TopBar.Size = UDim2.new(1, 0, 0, 30)
-TopBar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-TopBar.BackgroundTransparency = 0.5
+TopBar.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
 TopBar.BorderSizePixel = 0
 TopBar.Parent = MainFrame
 
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -100, 1, 0)
+Title.Size = UDim2.new(1, -120, 1, 0)
 Title.Position = UDim2.new(0, 10, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "BWSPY V1.01| Beta Test"
-Title.TextColor3 = Color3.fromRGB(220, 200, 220)
+Title.Text = "BWSPY V1.01 | Beta Test"
+Title.TextColor3 = Color3.fromRGB(240, 240, 240)
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 14
+Title.TextSize = 13
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TopBar
 
-local SettingsBtn = Instance.new("TextButton")
-SettingsBtn.Size = UDim2.new(0, 80, 0, 24)
-SettingsBtn.Position = UDim2.new(0.5, -40, 0.5, -12)
-SettingsBtn.BackgroundColor3 = Color3.fromRGB(180, 150, 220)
-SettingsBtn.Text = "Settings"
-SettingsBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
-SettingsBtn.Font = Enum.Font.GothamBold
-SettingsBtn.TextSize = 13
+local SettingsBtn = Instance.new("ImageButton")
+SettingsBtn.Size = UDim2.new(0, 18, 0, 18)
+SettingsBtn.Position = UDim2.new(1, -90, 0.5, -9)
+SettingsBtn.BackgroundTransparency = 1
+SettingsBtn.Image = "rbxassetid://104919049969988" 
+SettingsBtn.ImageColor3 = Color3.fromRGB(200, 200, 200)
+SettingsBtn.ZIndex = 10
 SettingsBtn.Parent = TopBar
-local SettingsBtnCorner = Instance.new("UICorner")
-SettingsBtnCorner.CornerRadius = UDim.new(0, 6)
-SettingsBtnCorner.Parent = SettingsBtn
 
 local MinimizeBtn = Instance.new("TextButton")
 MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
 MinimizeBtn.Position = UDim2.new(1, -60, 0, 0)
 MinimizeBtn.BackgroundTransparency = 1
 MinimizeBtn.Text = "-"
-MinimizeBtn.TextColor3 = Color3.new(1,1,1)
+MinimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
 MinimizeBtn.Font = Enum.Font.GothamBold
 MinimizeBtn.TextSize = 18
+MinimizeBtn.ZIndex = 10
 MinimizeBtn.Parent = TopBar
 
 local CloseBtn = Instance.new("TextButton")
@@ -152,9 +161,10 @@ CloseBtn.Size = UDim2.new(0, 30, 0, 30)
 CloseBtn.Position = UDim2.new(1, -30, 0, 0)
 CloseBtn.BackgroundTransparency = 1
 CloseBtn.Text = "X"
-CloseBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
+CloseBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
 CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.TextSize = 16
+CloseBtn.TextSize = 14
+CloseBtn.ZIndex = 10
 CloseBtn.Parent = TopBar
 
 local ContentHolder = Instance.new("Frame")
@@ -167,21 +177,20 @@ local LeftPanel = Instance.new("ScrollingFrame")
 LeftPanel.Size = UDim2.new(0.35, -10, 1, -10)
 LeftPanel.Position = UDim2.new(0, 5, 0, 5)
 LeftPanel.BackgroundTransparency = 1
-LeftPanel.ScrollBarThickness = 4
-LeftPanel.ScrollBarImageColor3 = Color3.fromRGB(80, 50, 80)
+LeftPanel.ScrollBarThickness = 2
+LeftPanel.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
 LeftPanel.AutomaticCanvasSize = Enum.AutomaticSize.Y
 LeftPanel.CanvasSize = UDim2.new(0, 0, 0, 0)
 LeftPanel.Parent = ContentHolder
 
 local LeftLayout = Instance.new("UIListLayout")
-LeftLayout.Padding = UDim.new(0, 5)
+LeftLayout.Padding = UDim.new(0, 4)
 LeftLayout.Parent = LeftPanel
 
 local RightPanel = Instance.new("Frame")
 RightPanel.Size = UDim2.new(0.65, -10, 1, -10)
 RightPanel.Position = UDim2.new(0.35, 5, 0, 5)
-RightPanel.BackgroundColor3 = Color3.fromRGB(10, 5, 10)
-RightPanel.BackgroundTransparency = 0.5
+RightPanel.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
 RightPanel.BorderSizePixel = 0
 RightPanel.Parent = ContentHolder
 
@@ -191,8 +200,8 @@ local CodeScroll = Instance.new("ScrollingFrame")
 CodeScroll.Size = UDim2.new(1, -10, 1, -35)
 CodeScroll.Position = UDim2.new(0, 5, 0, 5)
 CodeScroll.BackgroundTransparency = 1
-CodeScroll.ScrollBarThickness = 4
-CodeScroll.ScrollBarImageColor3 = Color3.fromRGB(80, 50, 80)
+CodeScroll.ScrollBarThickness = 2
+CodeScroll.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
 CodeScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 CodeScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 CodeScroll.Parent = RightPanel
@@ -212,11 +221,11 @@ CodeText.AutomaticSize = Enum.AutomaticSize.Y
 CodeText.Parent = CodeScroll
 
 local CopyBtn = Instance.new("TextButton")
-CopyBtn.Size = UDim2.new(1, -10, 0, 20)
-CopyBtn.Position = UDim2.new(0, 5, 1, -25)
-CopyBtn.BackgroundColor3 = Color3.fromRGB(40, 20, 40)
+CopyBtn.Size = UDim2.new(1, -10, 0, 24)
+CopyBtn.Position = UDim2.new(0, 5, 1, -29)
+CopyBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 CopyBtn.Text = "Copy Code Only"
-CopyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CopyBtn.TextColor3 = Color3.fromRGB(240, 240, 240)
 CopyBtn.Font = Enum.Font.GothamBold
 CopyBtn.TextSize = 11
 CopyBtn.Parent = RightPanel
@@ -224,36 +233,37 @@ Instance.new("UICorner", CopyBtn).CornerRadius = UDim.new(0, 4)
 
 local SettingsFrame = Instance.new("Frame")
 SettingsFrame.Size = UDim2.new(1, 0, 1, 0)
-SettingsFrame.BackgroundColor3 = Color3.fromRGB(18, 13, 18)
+SettingsFrame.Position = UDim2.new(1, 0, 0, 0) 
+SettingsFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
 SettingsFrame.BorderSizePixel = 0
 SettingsFrame.Visible = false
 SettingsFrame.Parent = MainFrame
 
 local SettingsTopBar = Instance.new("Frame")
 SettingsTopBar.Size = UDim2.new(1, 0, 0, 30)
-SettingsTopBar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-SettingsTopBar.BackgroundTransparency = 0.5
+SettingsTopBar.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
 SettingsTopBar.BorderSizePixel = 0
 SettingsTopBar.Parent = SettingsFrame
 
 local BackBtn = Instance.new("TextButton")
-BackBtn.Size = UDim2.new(0, 60, 0, 30)
+BackBtn.Size = UDim2.new(0, 60, 1, 0)
 BackBtn.Position = UDim2.new(0, 5, 0, 0)
 BackBtn.BackgroundTransparency = 1
-BackBtn.Text = "Back"
+BackBtn.Text = "< Back"
 BackBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-BackBtn.Font = Enum.Font.Gotham
-BackBtn.TextSize = 14
+BackBtn.Font = Enum.Font.GothamBold
+BackBtn.TextSize = 13
+BackBtn.ZIndex = 10
 BackBtn.Parent = SettingsTopBar
 
 local SettingsTitle = Instance.new("TextLabel")
-SettingsTitle.Size = UDim2.new(1, -140, 1, 0)
-SettingsTitle.Position = UDim2.new(0, 70, 0, 0)
+SettingsTitle.Size = UDim2.new(1, -150, 1, 0)
+SettingsTitle.Position = UDim2.new(0, 75, 0, 0)
 SettingsTitle.BackgroundTransparency = 1
 SettingsTitle.Text = "Settings"
-SettingsTitle.TextColor3 = Color3.fromRGB(220, 200, 220)
+SettingsTitle.TextColor3 = Color3.fromRGB(240, 240, 240)
 SettingsTitle.Font = Enum.Font.GothamBold
-SettingsTitle.TextSize = 14
+SettingsTitle.TextSize = 13
 SettingsTitle.TextXAlignment = Enum.TextXAlignment.Left
 SettingsTitle.Parent = SettingsTopBar
 
@@ -262,9 +272,10 @@ SettingsMinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
 SettingsMinimizeBtn.Position = UDim2.new(1, -60, 0, 0)
 SettingsMinimizeBtn.BackgroundTransparency = 1
 SettingsMinimizeBtn.Text = "-"
-SettingsMinimizeBtn.TextColor3 = Color3.new(1,1,1)
+SettingsMinimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
 SettingsMinimizeBtn.Font = Enum.Font.GothamBold
 SettingsMinimizeBtn.TextSize = 18
+SettingsMinimizeBtn.ZIndex = 10
 SettingsMinimizeBtn.Parent = SettingsTopBar
 
 local SettingsCloseBtn = Instance.new("TextButton")
@@ -272,9 +283,10 @@ SettingsCloseBtn.Size = UDim2.new(0, 30, 0, 30)
 SettingsCloseBtn.Position = UDim2.new(1, -30, 0, 0)
 SettingsCloseBtn.BackgroundTransparency = 1
 SettingsCloseBtn.Text = "X"
-SettingsCloseBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
+SettingsCloseBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
 SettingsCloseBtn.Font = Enum.Font.GothamBold
-SettingsCloseBtn.TextSize = 16
+SettingsCloseBtn.TextSize = 14
+SettingsCloseBtn.ZIndex = 10
 SettingsCloseBtn.Parent = SettingsTopBar
 
 local SettingsContent = Instance.new("Frame")
@@ -283,196 +295,175 @@ SettingsContent.Position = UDim2.new(0, 0, 0, 30)
 SettingsContent.BackgroundTransparency = 1
 SettingsContent.Parent = SettingsFrame
 
-local PingToggleFrame = Instance.new("Frame")
-PingToggleFrame.Size = UDim2.new(1, -20, 0, 36)
-PingToggleFrame.Position = UDim2.new(0, 10, 0, 15)
-PingToggleFrame.BackgroundColor3 = Color3.fromRGB(30, 20, 30)
-PingToggleFrame.BorderSizePixel = 0
-PingToggleFrame.Parent = SettingsContent
-Instance.new("UICorner", PingToggleFrame).CornerRadius = UDim.new(0, 6)
-
-local PingLabel = Instance.new("TextLabel")
-PingLabel.Size = UDim2.new(0, 120, 1, 0)
-PingLabel.Position = UDim2.new(0, 10, 0, 0)
-PingLabel.BackgroundTransparency = 1
-PingLabel.Text = "PING"
-PingLabel.TextColor3 = Color3.fromRGB(220, 200, 220)
-PingLabel.Font = Enum.Font.GothamBold
-PingLabel.TextSize = 14
-PingLabel.TextXAlignment = Enum.TextXAlignment.Left
-PingLabel.Parent = PingToggleFrame
-
-local PingToggleBtn = Instance.new("TextButton")
-PingToggleBtn.Size = UDim2.new(0, 44, 0, 24)
-PingToggleBtn.Position = UDim2.new(1, -54, 0.5, -12)
-PingToggleBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
-PingToggleBtn.Text = ""
-PingToggleBtn.Parent = PingToggleFrame
-Instance.new("UICorner", PingToggleBtn).CornerRadius = UDim.new(1, 0)
-local PingToggleIndicator = Instance.new("Frame")
-PingToggleIndicator.Size = UDim2.new(0, 18, 0, 18)
-PingToggleIndicator.Position = UDim2.new(1, -20, 0.5, -9)
-PingToggleIndicator.BackgroundColor3 = Color3.new(1,1,1)
-PingToggleIndicator.BorderSizePixel = 0
-PingToggleIndicator.Parent = PingToggleBtn
-Instance.new("UICorner", PingToggleIndicator).CornerRadius = UDim.new(1, 0)
-
 local showPing = true
-
-local AltMethodToggleFrame = Instance.new("Frame")
-AltMethodToggleFrame.Size = UDim2.new(1, -20, 0, 36)
-AltMethodToggleFrame.Position = UDim2.new(0, 10, 0, 65)
-AltMethodToggleFrame.BackgroundColor3 = Color3.fromRGB(30, 20, 30)
-AltMethodToggleFrame.BorderSizePixel = 0
-AltMethodToggleFrame.Parent = SettingsContent
-Instance.new("UICorner", AltMethodToggleFrame).CornerRadius = UDim.new(0, 6)
-
-local AltMethodLabel = Instance.new("TextLabel")
-AltMethodLabel.Size = UDim2.new(0, 160, 1, 0)
-AltMethodLabel.Position = UDim2.new(0, 10, 0, 0)
-AltMethodLabel.BackgroundTransparency = 1
-AltMethodLabel.Text = "Another method"
-AltMethodLabel.TextColor3 = Color3.fromRGB(220, 200, 220)
-AltMethodLabel.Font = Enum.Font.GothamBold
-AltMethodLabel.TextSize = 14
-AltMethodLabel.TextXAlignment = Enum.TextXAlignment.Left
-AltMethodLabel.Parent = AltMethodToggleFrame
-
-local AltMethodToggleBtn = Instance.new("TextButton")
-AltMethodToggleBtn.Size = UDim2.new(0, 44, 0, 24)
-AltMethodToggleBtn.Position = UDim2.new(1, -54, 0.5, -12)
-AltMethodToggleBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-AltMethodToggleBtn.Text = ""
-AltMethodToggleBtn.Parent = AltMethodToggleFrame
-Instance.new("UICorner", AltMethodToggleBtn).CornerRadius = UDim.new(1, 0)
-local AltMethodIndicator = Instance.new("Frame")
-AltMethodIndicator.Size = UDim2.new(0, 18, 0, 18)
-AltMethodIndicator.Position = UDim2.new(0, 2, 0.5, -9)
-AltMethodIndicator.BackgroundColor3 = Color3.new(1,1,1)
-AltMethodIndicator.BorderSizePixel = 0
-AltMethodIndicator.Parent = AltMethodToggleBtn
-Instance.new("UICorner", AltMethodIndicator).CornerRadius = UDim.new(1, 0)
-
 local useAlternativeMethod = false
 local alternativeOriginalFire = nil
 local alternativeHookedTable = nil
 
-local function updatePingToggleVisual()
-    if showPing then
-        PingToggleBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
-        PingToggleIndicator.Position = UDim2.new(1, -20, 0.5, -9)
-    else
-        PingToggleBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-        PingToggleIndicator.Position = UDim2.new(0, 2, 0.5, -9)
-    end
+local function createGitHubToggle(parent, labelText, yOffset)
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(1, -20, 0, 40)
+    Frame.Position = UDim2.new(0, 10, 0, yOffset)
+    Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    Frame.BorderSizePixel = 0
+    Frame.Parent = parent
+    Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 6)
+
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(1, -80, 1, 0)
+    Label.Position = UDim2.new(0, 12, 0, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = labelText
+    Label.TextColor3 = Color3.fromRGB(220, 220, 220)
+    Label.Font = Enum.Font.GothamBold
+    Label.TextSize = 13
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Frame
+
+    local ToggleBtn = Instance.new("TextButton")
+    ToggleBtn.Size = UDim2.new(0, 40, 0, 20)
+    ToggleBtn.Position = UDim2.new(1, -52, 0.5, -10)
+    ToggleBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    ToggleBtn.Text = ""
+    ToggleBtn.Parent = Frame
+    local ToggleCorner = Instance.new("UICorner")
+    ToggleCorner.CornerRadius = UDim.new(0, 10) -- Полностью скругленный
+    ToggleCorner.Parent = ToggleBtn
+
+    local Indicator = Instance.new("Frame")
+    Indicator.Size = UDim2.new(0, 14, 0, 14)
+    Indicator.Position = UDim2.new(0, 3, 0.5, -7)
+    Indicator.BackgroundColor3 = Color3.fromRGB(150, 150, 150)
+    Indicator.BorderSizePixel = 0
+    Indicator.Parent = ToggleBtn
+    local IndicatorCorner = Instance.new("UICorner")
+    IndicatorCorner.CornerRadius = UDim.new(0, 4) w
+    IndicatorCorner.Parent = Indicator
+
+    return ToggleBtn, Indicator
 end
 
-local function updateAltMethodToggleVisual()
-    if useAlternativeMethod then
-        AltMethodToggleBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
-        AltMethodIndicator.Position = UDim2.new(1, -20, 0.5, -9)
-    else
-        AltMethodToggleBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-        AltMethodIndicator.Position = UDim2.new(0, 2, 0.5, -9)
-    end
+local PingToggleBtn, PingIndicator = createGitHubToggle(SettingsContent, "Show Ping Remotes", 15)
+local AltMethodToggleBtn, AltMethodIndicator = createGitHubToggle(SettingsContent, "Alternative Method (getgc)", 65)
+
+local function updateToggleVisual(btn, indicator, state)
+    local targetBtnColor = state and Color3.fromRGB(240, 240, 240) or Color3.fromRGB(35, 35, 35)
+    local targetIndicatorColor = state and Color3.fromRGB(15, 15, 15) or Color3.fromRGB(150, 150, 150)
+    local targetPos = state and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
+
+    TweenService:Create(btn, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingStyle.Out), {BackgroundColor3 = targetBtnColor}):Play()
+    TweenService:Create(indicator, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingStyle.Out), {BackgroundColor3 = targetIndicatorColor, Position = targetPos}):Play()
 end
 
-PingToggleBtn.MouseButton1Click:Connect(function()
-    showPing = not showPing
-    updatePingToggleVisual()
+local function applyHoverEffect(obj, defaultCol, hoverCol, prop)
+    prop = prop or "BackgroundColor3"
+    obj.MouseEnter:Connect(function()
+        TweenService:Create(obj, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingStyle.Out), {[prop] = hoverCol}):Play()
+    end)
+    obj.MouseLeave:Connect(function()
+        TweenService:Create(obj, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingStyle.Out), {[prop] = defaultCol}):Play()
+    end)
+end
+
+applyHoverEffect(MinimizeBtn, Color3.fromRGB(200, 200, 200), Color3.fromRGB(255, 255, 255), "TextColor3")
+applyHoverEffect(CloseBtn, Color3.fromRGB(200, 200, 200), Color3.fromRGB(255, 80, 80), "TextColor3")
+applyHoverEffect(SettingsMinimizeBtn, Color3.fromRGB(200, 200, 200), Color3.fromRGB(255, 255, 255), "TextColor3")
+applyHoverEffect(SettingsCloseBtn, Color3.fromRGB(200, 200, 200), Color3.fromRGB(255, 80, 80), "TextColor3")
+applyHoverEffect(BackBtn, Color3.fromRGB(200, 200, 200), Color3.fromRGB(255, 255, 255), "TextColor3")
+applyHoverEffect(CopyBtn, Color3.fromRGB(30, 30, 30), Color3.fromRGB(45, 45, 45))
+
+SettingsBtn.MouseEnter:Connect(function()
+    TweenService:Create(SettingsBtn, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingStyle.Out), {Rotation = 45, ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+end)
+SettingsBtn.MouseLeave:Connect(function()
+    TweenService:Create(SettingsBtn, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingStyle.Out), {Rotation = 0, ImageColor3 = Color3.fromRGB(200, 200, 200)}):Play()
 end)
 
-AltMethodToggleBtn.MouseButton1Click:Connect(function()
-    useAlternativeMethod = not useAlternativeMethod
-    updateAltMethodToggleVisual()
-    if useAlternativeMethod then
-        local foundTable = nil
-        for _, v in pairs(getgc(true)) do
-            if type(v) == "table" and rawget(v, "Type") == "Packet" and rawget(v, "Fire") then
-                foundTable = v
-                break
-            end
-        end
-        if foundTable then
-            alternativeOriginalFire = foundTable.Fire
-            alternativeHookedTable = foundTable
-            foundTable.Fire = function(self, ...)
-                local args = {...}
-                local name = tostring(self.Name)
-                local id = tostring(self.Id)
-                if showPing or not string.find(name, "Ping") then
-                    table.insert(LogQueue, {
-                        type = "Packet",
-                        name = name,
-                        id = id,
-                        args = args
-                    })
-                end
-                return alternativeOriginalFire(self, ...)
-            end
-            pcall(function()
-                hookmetamethod(game, "__namecall", trueOriginalNamecall)
-            end)
-            CodeText.Text = "// Alternate method activated (PacketTable hooked)"
-        else
-            useAlternativeMethod = false
-            updateAltMethodToggleVisual()
-            CodeText.Text = "// [ERROR] PacketTable not found. Alternative method cannot be enabled."
-        end
-    else
-        if alternativeHookedTable and alternativeOriginalFire then
-            alternativeHookedTable.Fire = alternativeOriginalFire
-            alternativeHookedTable = nil
-            alternativeOriginalFire = nil
-        end
-        pcall(function()
-            oldNamecall = hookmetamethod(game, "__namecall", namecallHook)
-        end)
-        CodeText.Text = "// Alternate method disabled, standard hook restored"
-    end
-end)
-
-BackBtn.MouseButton1Click:Connect(function()
-    SettingsFrame.Visible = false
-    ContentHolder.Visible = true
-end)
-
-SettingsMinimizeBtn.MouseButton1Click:Connect(function()
-    isMinimized = not isMinimized
-    local targetSize = isMinimized and UDim2.new(0, 650, 0, 30) or UDim2.new(0, 650, 0, 400)
-    ContentHolder.Visible = not isMinimized
-    SettingsFrame.Visible = false
-    TweenService:Create(MainFrame, TweenInfo.new(0.3), {Size = targetSize}):Play()
-end)
-
-SettingsCloseBtn.MouseButton1Click:Connect(function()
-    ScreenGui:Destroy()
-end)
-
-SettingsBtn.MouseButton1Click:Connect(function()
+local function showSettings()
+    SettingsFrame.Position = UDim2.new(1, 0, 0, 0)
     SettingsFrame.Visible = true
-    ContentHolder.Visible = false
-end)
+    TweenService:Create(SettingsFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingStyle.Out), {Position = UDim2.new(0, 0, 0, 0)}):Play()
+    TweenService:Create(ContentHolder, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingStyle.Out), {Position = UDim2.new(-1, 0, 0, 30)}):Play()
+end
+
+local function hideSettings()
+    TweenService:Create(SettingsFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingStyle.Out), {Position = UDim2.new(1, 0, 0, 0)}):Play()
+    TweenService:Create(ContentHolder, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingStyle.Out), {Position = UDim2.new(0, 0, 0, 30)}):Play()
+    task.wait(0.3)
+    SettingsFrame.Visible = false
+end
+
+SettingsBtn.Activated:Connect(showSettings)
+BackBtn.Activated:Connect(hideSettings)
 
 local dragging, dragStart, startPos
-TopBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true; dragStart = input.Position; startPos = MainFrame.Position
+
+local function isMouseOverButton(button)
+    local mouse = game:GetService("Players").LocalPlayer:GetMouse()
+    local x, y = mouse.X, mouse.Y
+    local absPos = button.AbsolutePosition
+    local absSize = button.AbsoluteSize
+    return x >= absPos.X and x <= absPos.X + absSize.X and y >= absPos.Y and y <= absPos.Y + absSize.Y
+end
+
+local function onInputBegan(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if isMouseOverButton(MinimizeBtn) or isMouseOverButton(CloseBtn) or isMouseOverButton(SettingsBtn) or 
+           isMouseOverButton(SettingsMinimizeBtn) or isMouseOverButton(SettingsCloseBtn) or isMouseOverButton(BackBtn) then
+            return
+        end
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        
+        local connection
+        connection = input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+                connection:Disconnect()
+            end
+        end)
     end
-end)
+end
+
+TopBar.InputBegan:Connect(onInputBegan)
+SettingsTopBar.InputBegan:Connect(onInputBegan)
+
 UserInputService.InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         local delta = input.Position - dragStart
         MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
-end)
+
+local isMinimized = false
+local function toggleMinimize()
+    isMinimized = not isMinimized
+    local targetSize = isMinimized and UDim2.new(0, 650, 0, 30) or UDim2.new(0, 650, 0, 400)
+    ContentHolder.Visible = not isMinimized
+    if SettingsFrame.Visible then
+        SettingsFrame.Visible = false
+    end
+    TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingStyle.Out), {Size = targetSize}):Play()
+end
+
+MinimizeBtn.Activated:Connect(toggleMinimize)
+SettingsMinimizeBtn.Activated:Connect(toggleMinimize)
+
+local function closeGui()
+    local fadeTween = TweenService:Create(MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingStyle.In), {Size = UDim2.new(0, 650, 0, 0)})
+    fadeTween:Play()
+    fadeTween.Completed:Connect(function()
+        ScreenGui:Destroy()
+    end)
+end
+
+CloseBtn.Activated:Connect(closeGui)
+SettingsCloseBtn.Activated:Connect(closeGui)
 
 local currentCopyCode = ""
-CopyBtn.MouseButton1Click:Connect(function()
-    if currentCopyCode ~= "" and setclipboard then
+CopyBtn.Activated:Connect(function()
+    if currentCopyCode ~= "" then
         setclipboard(currentCopyCode)
         CopyBtn.Text = "Code copied!"
         task.wait(1.5)
@@ -486,7 +477,7 @@ local MAX_LOGS = 150
 local function AddLogToUI(entry)
     local LogFrame = Instance.new("TextButton")
     LogFrame.Size = UDim2.new(1, 0, 0, 25)
-    LogFrame.BackgroundColor3 = Color3.fromRGB(30, 20, 30)
+    LogFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
     LogFrame.Text = ""
     LogFrame.Parent = LeftPanel
     Instance.new("UICorner", LogFrame).CornerRadius = UDim.new(0, 4)
@@ -496,11 +487,11 @@ local function AddLogToUI(entry)
 
     if entry.type == "Packet" then
         methodLabel = "PKT"
-        methodColor = Color3.fromRGB(200, 150, 100)
+        methodColor = Color3.fromRGB(130, 130, 130)
         displayName = entry.name .. " [" .. entry.id .. "]"
     else
         methodLabel = entry.method == "FireServer" and "FIRE" or "INVK"
-        methodColor = entry.method == "FireServer" and Color3.fromRGB(100, 200, 100) or Color3.fromRGB(100, 150, 255)
+        methodColor = entry.method == "FireServer" and Color3.fromRGB(240, 240, 240) or Color3.fromRGB(170, 170, 170)
         displayName = tostring(entry.remote.Name)
     end
 
@@ -517,7 +508,9 @@ local function AddLogToUI(entry)
     NameLbl.Font = Enum.Font.Code; NameLbl.TextSize = 11; NameLbl.TextXAlignment = Enum.TextXAlignment.Left
     NameLbl.TextTruncate = Enum.TextTruncate.AtEnd
 
-    LogFrame.MouseButton1Click:Connect(function()
+    applyHoverEffect(LogFrame, Color3.fromRGB(20, 20, 20), Color3.fromRGB(30, 30, 30))
+
+    LogFrame.Activated:Connect(function()
         if entry.type == "Packet" then
             local uiText, copyCode = generatePacketDetails(entry.name, entry.id, entry.args)
             CodeText.Text = uiText
@@ -544,6 +537,8 @@ RunService.RenderStepped:Connect(function()
 end)
 
 local trueOriginalNamecall
+local oldNamecall
+
 local namecallHook = newcclosure(function(self, ...)
     local method = getnamecallmethod()
     if not checkcaller() and (method == "FireServer" or method == "InvokeServer") then
@@ -562,21 +557,84 @@ local namecallHook = newcclosure(function(self, ...)
             })
         end
     end
-    return oldNamecall(self, ...)
+    
+    if oldNamecall then
+        return oldNamecall(self, ...)
+    else
+        local mt = getrawmetatable and getrawmetatable(game)
+        local orig = mt and mt.__namecall
+        if orig then
+            return orig(self, ...)
+        end
+    end
 end)
 
-trueOriginalNamecall = hookmetamethod(game, "__namecall", namecallHook)
-oldNamecall = trueOriginalNamecall
+if hookmetamethod then
+    trueOriginalNamecall = hookmetamethod(game, "__namecall", namecallHook)
+    oldNamecall = trueOriginalNamecall
+else
+    CodeText.Text = "// [ERROR] hookmetamethod is not supported on this executor."
+end
 
-local isMinimized = false
-MinimizeBtn.MouseButton1Click:Connect(function()
-    isMinimized = not isMinimized
-    local targetSize = isMinimized and UDim2.new(0, 650, 0, 30) or UDim2.new(0, 650, 0, 400)
-    ContentHolder.Visible = not isMinimized
-    TweenService:Create(MainFrame, TweenInfo.new(0.3), {Size = targetSize}):Play()
+PingToggleBtn.Activated:Connect(function()
+    showPing = not showPing
+    updateToggleVisual(PingToggleBtn, PingIndicator, showPing)
 end)
 
-CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+AltMethodToggleBtn.Activated:Connect(function()
+    useAlternativeMethod = not useAlternativeMethod
+    updateToggleVisual(AltMethodToggleBtn, AltMethodIndicator, useAlternativeMethod)
+    
+    if useAlternativeMethod then
+        local foundTable = nil
+        for _, v in pairs(getgc(true)) do
+            if type(v) == "table" and rawget(v, "Type") == "Packet" and rawget(v, "Fire") then
+                foundTable = v
+                break
+            end
+        end
+        if foundTable then
+            alternativeOriginalFire = foundTable.Fire
+            alternativeHookedTable = foundTable
+            foundTable.Fire = function(self, ...)
+                local args = {...}
+                local name = tostring(self.Name)
+                local id = tostring(self.Id)
+                if showPing or not string.find(name, "Ping") then
+                    table.insert(LogQueue, {
+                        type = "Packet",
+                        name = name,
+                        id = id,
+                        args = args
+                    })
+                end
+                return alternativeOriginalFire(self, ...)
+            end
+            if trueOriginalNamecall then
+                pcall(function()
+                    hookmetamethod(game, "__namecall", trueOriginalNamecall)
+                end)
+            end
+            CodeText.Text = "// Alternate method activated (PacketTable hooked)"
+        else
+            useAlternativeMethod = false
+            updateToggleVisual(AltMethodToggleBtn, AltMethodIndicator, false)
+            CodeText.Text = "// [ERROR] PacketTable not found. Alternative method cannot be enabled."
+        end
+    else
+        if alternativeHookedTable and alternativeOriginalFire then
+            alternativeHookedTable.Fire = alternativeOriginalFire
+            alternativeHookedTable = nil
+            alternativeOriginalFire = nil
+        end
+        if hookmetamethod then
+            pcall(function()
+                oldNamecall = hookmetamethod(game, "__namecall", namecallHook)
+            end)
+        end
+        CodeText.Text = "// Alternate method disabled, standard hook restored"
+    end
+end)
 
-updatePingToggleVisual()
-updateAltMethodToggleVisual()
+updateToggleVisual(PingToggleBtn, PingIndicator, showPing)
+updateToggleVisual(AltMethodToggleBtn, AltMethodIndicator, useAlternativeMethod)
