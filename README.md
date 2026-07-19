@@ -9,7 +9,7 @@ Sincerely, CalCor
 > ## 📃 Script
 >
 > ```lua
-> loadstring(game:HttpGet("https://raw.githubusercontent.com/CherryCalCor/BWSPY.Lua/refs/heads/main/Code"))()
+> loadstring(game:HttpGet("https://raw.githubusercontent.com/CherryCalCor/BWSPY.Lua/refs/heads/main/Code.Lua"))()
 > ```
 >
 > 
